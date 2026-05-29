@@ -10,10 +10,11 @@
 
 ## v0.2
 
-- Animated sphere frames for time-sliced optical transport.
+- Animated optical frames for time-sliced transport.
 - Browser sender and receiver pages.
-- Camera input prototype with WebCodecs / Canvas.
+- Camera input prototype with Canvas sampling.
 - Reed-Solomon or fountain-code style redundancy.
+ - Perspective correction and adaptive thresholding.
 
 ## v0.3
 
@@ -21,4 +22,3 @@
 - Replay protection ledger.
 - Bidirectional visual return frames.
 - Latency and error-rate test harness.
-

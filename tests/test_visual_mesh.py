@@ -6,6 +6,7 @@ from uvip_qsom_visual_mesh.frames import make_frames, reassemble_frames
 from uvip_qsom_visual_mesh.mcp_envelope import build_mcp_envelope
 from uvip_qsom_visual_mesh.receiver import scan_path
 from uvip_qsom_visual_mesh.visual import render_sphere_svg, render_wave_svg
+from uvip_qsom_visual_mesh.optical import decode_optical_frames, encode_optical_frames, matrix_to_frame, roundtrip_payload_bytes
 
 
 def test_mcp_envelope_frames_reassemble() -> None:
@@ -66,3 +67,17 @@ def test_receiver_detects_tampered_payload(tmp_path: Path) -> None:
     assert report["valid"] is False
     assert "Payload hash mismatch." in report["errors"]
 
+
+def test_optical_codec_roundtrips_payload_bytes() -> None:
+    payload = b'{"method":"tools/list","transport":"camera"}'
+
+    assert roundtrip_payload_bytes(payload) == payload
+
+
+def test_optical_frames_roundtrip_encoded_payload() -> None:
+    encoded = "abcdefghijklmnopqrstuvwxyz0123456789" * 10
+    frames = encode_optical_frames(encoded)
+    decoded = decode_optical_frames([matrix_to_frame(frame.matrix) for frame in frames])
+
+    assert decoded == encoded
+    assert len(frames) > 1

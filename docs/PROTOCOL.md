@@ -39,6 +39,22 @@ It validates:
 - frame sequence completeness,
 - reassembled frame payload hash.
 
+## Camera Optical Alpha
+
+The browser optical transport adds:
+
+- `41x41` high-contrast optical frame grid,
+- three finder patterns,
+- `QSOM` frame magic,
+- frame version,
+- frame index and count,
+- payload length,
+- CRC32 per frame,
+- repeated animated transmission,
+- browser camera receiver using `getUserMedia` and canvas sampling.
+
+This is screen-to-camera alpha transport. It expects low perspective distortion and a centered sender square. Future versions should add perspective correction, adaptive thresholding, and stronger forward error correction.
+
 ## MCP Boundary
 
 Decoded messages are untrusted input. A real MCP server must still apply:
@@ -52,4 +68,3 @@ Decoded messages are untrusted input. A real MCP server must still apply:
 ## No Secrets
 
 Visual payloads are observable by anyone who can see the screen or image. Do not encode tokens, private keys, credentials, recovery codes, or confidential records.
-

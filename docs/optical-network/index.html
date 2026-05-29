@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UVIP/QSOM Camera Optical Network</title>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #07111f; color: #e5eefb; }
+    main { max-width: 1220px; margin: 0 auto; padding: 18px; }
+    h1 { margin: 0 0 8px; font-size: clamp(28px, 4vw, 56px); letter-spacing: 0; }
+    p { color: #b8c4d6; line-height: 1.45; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0; }
+    button { min-height: 42px; border: 0; border-radius: 6px; padding: 0 14px; font-weight: 750; color: #05111f; background: #6ee7b7; cursor: pointer; }
+    button.secondary { background: #bfdbfe; }
+    .grid { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr); gap: 16px; align-items: start; }
+    .panel { border: 1px solid #263445; border-radius: 8px; background: #0d1b2d; padding: 12px; }
+    canvas, video { width: 100%; border-radius: 8px; background: #fff; display: block; }
+    video { background: #000; }
+    pre { overflow-x: auto; max-height: 320px; background: #020617; color: #dbeafe; border-radius: 8px; padding: 12px; }
+    .status { min-height: 24px; color: #fef3c7; }
+    @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>UVIP/QSOM Camera Optical Network</h1>
+    <p>Alpha screen-to-camera transport for MCP envelopes. Use two devices or two browser windows: one sends animated optical frames; the other receives through the camera. No secrets belong in this channel.</p>
+    <div class="toolbar">
+      <button id="startSender">Start Sender</button>
+      <button id="stopSender" class="secondary">Stop Sender</button>
+      <button id="startCamera">Start Camera Receiver</button>
+      <button id="scanStill" class="secondary">Scan Still Canvas</button>
+    </div>
+    <div class="grid">
+      <section class="panel">
+        <h2>Sender</h2>
+        <canvas id="sendCanvas" width="820" height="820"></canvas>
+        <p id="sendStatus" class="status">Sender idle.</p>
+      </section>
+      <section class="panel">
+        <h2>Receiver</h2>
+        <video id="video" playsinline muted></video>
+        <canvas id="captureCanvas" width="820" height="820"></canvas>
+        <p id="recvStatus" class="status">Receiver idle.</p>
+      </section>
+    </div>
+    <section class="panel">
+      <h2>Decoded MCP Envelope</h2>
+      <pre id="decoded">{}</pre>
+    </section>
+  </main>
+  <script src="optical.js"></script>
+  <script>
+    const sendCanvas = document.getElementById("sendCanvas");
+    const captureCanvas = document.getElementById("captureCanvas");
+    const video = document.getElementById("video");
+    const sendStatus = document.getElementById("sendStatus");
+    const recvStatus = document.getElementById("recvStatus");
+    const decoded = document.getElementById("decoded");
+    let frames = [];
+    let senderTimer = null;
+    let senderIndex = 0;
+    let scanTimer = null;
+    const captured = new Map();
+
+    function prepareFrames() {
+      const payload = QSOM.senderPayload();
+      frames = QSOM.encodeOpticalFrames(payload);
+      sendStatus.textContent = `Prepared ${frames.length} optical frame(s) for ${payload.method}.`;
+    }
+
+    function drawNextFrame() {
+      if (!frames.length) prepareFrames();
+      const frame = frames[senderIndex % frames.length];
+      QSOM.drawMatrix(sendCanvas, frame.matrix);
+      sendStatus.textContent = `Sending frame ${frame.index + 1}/${frame.count}. Keep the square filling the receiver guide.`;
+      senderIndex += 1;
+    }
+
+    document.getElementById("startSender").addEventListener("click", () => {
+      prepareFrames();
+      drawNextFrame();
+      clearInterval(senderTimer);
+      senderTimer = setInterval(drawNextFrame, 420);
+    });
+
+    document.getElementById("stopSender").addEventListener("click", () => {
+      clearInterval(senderTimer);
+      senderTimer = null;
+      sendStatus.textContent = "Sender stopped.";
+    });
+
+    async function startCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: 1280, height: 720 }, audio: false });
+      video.srcObject = stream;
+      await video.play();
+      recvStatus.textContent = "Camera active. Center the sender square in the capture canvas.";
+      clearInterval(scanTimer);
+      scanTimer = setInterval(scanVideo, 350);
+    }
+
+    function drawVideoToCapture() {
+      const ctx = captureCanvas.getContext("2d", { willReadFrequently: true });
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, captureCanvas.width, captureCanvas.height);
+      if (video.videoWidth && video.videoHeight) {
+        const side = Math.min(video.videoWidth, video.videoHeight);
+        const sx = (video.videoWidth - side) / 2;
+        const sy = (video.videoHeight - side) / 2;
+        ctx.drawImage(video, sx, sy, side, side, 0, 0, captureCanvas.width, captureCanvas.height);
+      }
+      ctx.strokeStyle = "#f59e0b";
+      ctx.lineWidth = 8;
+      ctx.strokeRect(10, 10, captureCanvas.width - 20, captureCanvas.height - 20);
+    }
+
+    function acceptFrame(frame) {
+      captured.set(frame.index, frame);
+      recvStatus.textContent = `Captured ${captured.size}/${frame.count} frame(s).`;
+      try {
+        if (captured.size === frame.count) {
+          const payload = QSOM.decodeOpticalFrames(captured);
+          decoded.textContent = JSON.stringify(payload, null, 2);
+          recvStatus.textContent = `Decoded ${frame.count} frame(s): ${payload.method}`;
+        }
+      } catch (error) {
+        recvStatus.textContent = `Waiting for clean frames: ${error.message}`;
+      }
+    }
+
+    function scanCanvas(canvas) {
+      const matrix = QSOM.sampleCanvasToMatrix(canvas);
+      const frame = QSOM.frameFromMatrix(matrix);
+      acceptFrame(frame);
+    }
+
+    function scanVideo() {
+      drawVideoToCapture();
+      try {
+        scanCanvas(captureCanvas);
+      } catch (error) {
+        recvStatus.textContent = `Scanning: ${error.message}`;
+      }
+    }
+
+    document.getElementById("startCamera").addEventListener("click", () => {
+      startCamera().catch(error => { recvStatus.textContent = `Camera error: ${error.message}`; });
+    });
+
+    document.getElementById("scanStill").addEventListener("click", () => {
+      try {
+        const ctx = captureCanvas.getContext("2d");
+        ctx.drawImage(sendCanvas, 0, 0, captureCanvas.width, captureCanvas.height);
+        scanCanvas(captureCanvas);
+      } catch (error) {
+        recvStatus.textContent = `Still scan failed: ${error.message}`;
+      }
+    });
+
+    prepareFrames();
+    drawNextFrame();
+  </script>
+</body>
+</html>

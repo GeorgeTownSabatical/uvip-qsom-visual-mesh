@@ -18,6 +18,7 @@ The first implementation provides:
 - HTML demo pages with embedded metadata,
 - scanner/receiver support for JSON, SVG metadata, and HTML metadata,
 - tamper detection through payload and frame hashes.
+- browser alpha screen-to-camera optical transport.
 
 ## What It Is Not
 
@@ -45,6 +46,22 @@ Open:
 examples/demo/index.html
 ```
 
+Camera optical alpha:
+
+```text
+https://georgetownsabatical.github.io/uvip-qsom-visual-mesh/optical-network/
+```
+
+The optical page includes a sender, camera receiver, and still-canvas validation path.
+
+Air-gapped operation:
+
+```text
+AI / MCP client A -> screen frames -> camera -> AI / MCP receiver B
+```
+
+The machines do not need internet access or the same network. They only need a visual line-of-sight path. Decoded messages remain untrusted until the receiver validates hashes and authorizes the MCP method.
+
 ## MCP Visual Envelope
 
 The payload carries enough information for an MCP-style message exchange:
@@ -67,4 +84,3 @@ Do not put secrets, private keys, credentials, or live bearer tokens into visual
 ## Evidence Boundary
 
 UVIP/QSOM visual frames can attest that a specific message envelope was produced and has not changed. They do not prove external facts or authorize an MCP server by themselves.
-
