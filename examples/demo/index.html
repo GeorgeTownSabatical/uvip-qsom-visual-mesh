@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UVIP QSO Visual Mesh Demo</title>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #162033; background: #f8fbff; }
+    main { max-width: 1180px; margin: 0 auto; padding: 20px; }
+    h1 { font-size: clamp(32px, 5vw, 58px); margin: 0 0 8px; letter-spacing: 0; }
+    .lead { color: #536173; font-size: 18px; max-width: 850px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 20px 0; }
+    .panel { background: #fff; border: 1px solid #d8dee6; border-radius: 8px; padding: 14px; }
+    iframe { width: 100%; min-height: 420px; border: 0; background: white; }
+    pre { overflow-x: auto; max-height: 360px; padding: 12px; border-radius: 8px; background: #101820; color: #f8fbff; }
+    code { background: #edf1f5; border-radius: 4px; padding: 2px 5px; }
+    @media (max-width: 840px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>UVIP QSO Visual Mesh Demo</h1>
+    <p class="lead">A visual-only MCP envelope prototype. Wave and sphere renderings carry the same payload in embedded metadata and frame sidecars.</p>
+    <script type="application/json" id="uvip-qsom-visual-payload">{&quot;frames&quot;:[{&quot;created_at&quot;:&quot;2026-05-29T06:28:59.373690+00:00&quot;,&quot;data&quot;:&quot;eyJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yOVQwNjoyODo1OS4zNzMxMTMrMDA6MDAiLCJldmlkZW5jZV9ib3VuZGFyeSI6IlZpc3VhbCBNQ1AgZW52ZWxvcGUgb25seTsgZG9lcyBub3QgYXV0aG9yaXplIHRvb2wgZXhlY3V0aW9uIGJ5IGl0c2VsZi4iLCJtZXNzYWdlX2lkIjoibXNnLWIxOTJjM2Y1ZTFkOWU4ODYiLCJtZXRob2QiOiJ0b29scy9saXN0Iiwibm9uY2UiOiIwZTJlNjE1MmUzNDQ1NTUyMTJjMjg0ZTQ2NGE3YjkzNSIsInBhcmFtcyI6eyJyZXF1ZXN0ZWRfY2FwYWJpbGl0eSI6Im1jcF9tZXNzYWdlX2V4Y2hhbmdlIiwic2FmZXR5Ijoibm8gc2Vj&quot;,&quot;encoding&quot;:&quot;base64url-canonical-json&quot;,&quot;frame_count&quot;:3,&quot;frame_hash&quot;:&quot;ee5aace7b99b2be9a830d6d78bc14a1478759655f878baf3195cbb3a826eb502&quot;,&quot;frame_index&quot;:0,&quot;parent_payload_hash&quot;:&quot;e87ee14c3dd3a59510b785a2c8983e48e274b372ca32a8a02a35798c119ae245&quot;,&quot;protocol&quot;:&quot;UVIP-QSOM-VISUAL&quot;,&quot;schema&quot;:&quot;uvip_qsom_visual_frame.v1&quot;,&quot;symbol_mode&quot;:&quot;wave-bar-sphere&quot;},{&quot;created_at&quot;:&quot;2026-05-29T06:28:59.373738+00:00&quot;,&quot;data&quot;:&quot;cmV0czsgcmVjZWl2ZXIgbXVzdCBhdXRob3JpemUgZGVjb2RlZCBtZXRob2RzIiwidHJhbnNwb3J0IjoidmlzdWFsLW9ubHkifSwicGF5bG9hZF9oYXNoIjoiZTg3ZWUxNGMzZGQzYTU5NTEwYjc4NWEyYzg5ODNlNDhlMjc0YjM3MmNhMzJhOGEwMmEzNTc5OGMxMTlhZTI0NSIsInByb3RvY29sIjoiVVZJUC1RU09NLU1DUCIsInByb3RvY29sX3ZlcnNpb24iOiIwLjEuMCIsInJlY2VpdmVyX2lkIjoibWNwLnNlcnZlci52aXN1YWwucmVjZWl2ZXIiLCJyZXBseV9jaGFubmVsX2hpbnQiOiJ2aXN1YWwtcmV0dXJuLWZyYW1lIiwic2NoZW1hIjoidXZpcF9xc29t&quot;,&quot;encoding&quot;:&quot;base64url-canonical-json&quot;,&quot;frame_count&quot;:3,&quot;frame_hash&quot;:&quot;ad66df64cbc340c0f27cb19449d38a00c04d901a9eff1f5212713c537366c39e&quot;,&quot;frame_index&quot;:1,&quot;parent_payload_hash&quot;:&quot;e87ee14c3dd3a59510b785a2c8983e48e274b372ca32a8a02a35798c119ae245&quot;,&quot;protocol&quot;:&quot;UVIP-QSOM-VISUAL&quot;,&quot;schema&quot;:&quot;uvip_qsom_visual_frame.v1&quot;,&quot;symbol_mode&quot;:&quot;wave-bar-sphere&quot;},{&quot;created_at&quot;:&quot;2026-05-29T06:28:59.373772+00:00&quot;,&quot;data&quot;:&quot;X21jcF9lbnZlbG9wZS52MSIsInNlbmRlcl9pZCI6InV2aXAtcXNvbS5zZW5kZXIubG9jYWwiLCJzZXNzaW9uX2lkIjoic2Vzc2lvbi1iNmY3ZDAxMmY0NzczNzJlIiwidHJhbnNwb3J0X2JvdW5kYXJ5IjoiVmlzdWFsLW9ubHkgdHJhbnNtaXNzaW9uIHNob3VsZCBiZSB0cmVhdGVkIGFzIHVudHJ1c3RlZCBpbnB1dCB1bnRpbCBkZWNvZGVkLCBoYXNoLWNoZWNrZWQsIGFuZCBwb2xpY3ktYXV0aG9yaXplZC4ifQ&quot;,&quot;encoding&quot;:&quot;base64url-canonical-json&quot;,&quot;frame_count&quot;:3,&quot;frame_hash&quot;:&quot;fd826e2ae04d693f37ef98330577186774ef01b3f67328dbdc0b8bd1abb38e33&quot;,&quot;frame_index&quot;:2,&quot;parent_payload_hash&quot;:&quot;e87ee14c3dd3a59510b785a2c8983e48e274b372ca32a8a02a35798c119ae245&quot;,&quot;protocol&quot;:&quot;UVIP-QSOM-VISUAL&quot;,&quot;schema&quot;:&quot;uvip_qsom_visual_frame.v1&quot;,&quot;symbol_mode&quot;:&quot;wave-bar-sphere&quot;}],&quot;payload&quot;:{&quot;created_at&quot;:&quot;2026-05-29T06:28:59.373113+00:00&quot;,&quot;evidence_boundary&quot;:&quot;Visual MCP envelope only; does not authorize tool execution by itself.&quot;,&quot;message_id&quot;:&quot;msg-b192c3f5e1d9e886&quot;,&quot;method&quot;:&quot;tools/list&quot;,&quot;nonce&quot;:&quot;0e2e6152e344555212c284e464a7b935&quot;,&quot;params&quot;:{&quot;requested_capability&quot;:&quot;mcp_message_exchange&quot;,&quot;safety&quot;:&quot;no secrets; receiver must authorize decoded methods&quot;,&quot;transport&quot;:&quot;visual-only&quot;},&quot;payload_hash&quot;:&quot;e87ee14c3dd3a59510b785a2c8983e48e274b372ca32a8a02a35798c119ae245&quot;,&quot;protocol&quot;:&quot;UVIP-QSOM-MCP&quot;,&quot;protocol_version&quot;:&quot;0.1.0&quot;,&quot;receiver_id&quot;:&quot;mcp.server.visual.receiver&quot;,&quot;reply_channel_hint&quot;:&quot;visual-return-frame&quot;,&quot;schema&quot;:&quot;uvip_qsom_mcp_envelope.v1&quot;,&quot;sender_id&quot;:&quot;uvip-qsom.sender.local&quot;,&quot;session_id&quot;:&quot;session-b6f7d012f477372e&quot;,&quot;transport_boundary&quot;:&quot;Visual-only transmission should be treated as untrusted input until decoded, hash-checked, and policy-authorized.&quot;}}</script>
+    <div class="grid">
+      <section class="panel">
+        <h2>Sphere Field</h2>
+        <iframe src="sphere_field.svg" title="UVIP QSO sphere field"></iframe>
+      </section>
+      <section class="panel">
+        <h2>Wave Barcode</h2>
+        <iframe src="wave_barcode.svg" title="UVIP QSO wave barcode"></iframe>
+      </section>
+    </div>
+    <section class="panel">
+      <h2>MCP Envelope</h2>
+      <p><strong>Method:</strong> <code>tools/list</code></p>
+      <p><strong>Payload Hash:</strong> <code>e87ee14c3dd3a59510b785a2c8983e48e274b372ca32a8a02a35798c119ae245</code></p>
+      <p><strong>Boundary:</strong> Visual-only transmission should be treated as untrusted input until decoded, hash-checked, and policy-authorized.</p>
+      <pre>{
+  &quot;created_at&quot;: &quot;2026-05-29T06:28:59.373113+00:00&quot;,
+  &quot;evidence_boundary&quot;: &quot;Visual MCP envelope only; does not authorize tool execution by itself.&quot;,
+  &quot;message_id&quot;: &quot;msg-b192c3f5e1d9e886&quot;,
+  &quot;method&quot;: &quot;tools/list&quot;,
+  &quot;nonce&quot;: &quot;0e2e6152e344555212c284e464a7b935&quot;,
+  &quot;params&quot;: {
+    &quot;requested_capability&quot;: &quot;mcp_message_exchange&quot;,
+    &quot;safety&quot;: &quot;no secrets; receiver must authorize decoded methods&quot;,
+    &quot;transport&quot;: &quot;visual-only&quot;
+  },
+  &quot;payload_hash&quot;: &quot;e87ee14c3dd3a59510b785a2c8983e48e274b372ca32a8a02a35798c119ae245&quot;,
+  &quot;protocol&quot;: &quot;UVIP-QSOM-MCP&quot;,
+  &quot;protocol_version&quot;: &quot;0.1.0&quot;,
+  &quot;receiver_id&quot;: &quot;mcp.server.visual.receiver&quot;,
+  &quot;reply_channel_hint&quot;: &quot;visual-return-frame&quot;,
+  &quot;schema&quot;: &quot;uvip_qsom_mcp_envelope.v1&quot;,
+  &quot;sender_id&quot;: &quot;uvip-qsom.sender.local&quot;,
+  &quot;session_id&quot;: &quot;session-b6f7d012f477372e&quot;,
+  &quot;transport_boundary&quot;: &quot;Visual-only transmission should be treated as untrusted input until decoded, hash-checked, and policy-authorized.&quot;
+}</pre>
+    </section>
+  </main>
+</body>
+</html>

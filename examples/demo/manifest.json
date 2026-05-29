@@ -1,0 +1,61 @@
+{
+  "frames": [
+    {
+      "created_at": "2026-05-29T06:28:59.373690+00:00",
+      "data": "eyJjcmVhdGVkX2F0IjoiMjAyNi0wNS0yOVQwNjoyODo1OS4zNzMxMTMrMDA6MDAiLCJldmlkZW5jZV9ib3VuZGFyeSI6IlZpc3VhbCBNQ1AgZW52ZWxvcGUgb25seTsgZG9lcyBub3QgYXV0aG9yaXplIHRvb2wgZXhlY3V0aW9uIGJ5IGl0c2VsZi4iLCJtZXNzYWdlX2lkIjoibXNnLWIxOTJjM2Y1ZTFkOWU4ODYiLCJtZXRob2QiOiJ0b29scy9saXN0Iiwibm9uY2UiOiIwZTJlNjE1MmUzNDQ1NTUyMTJjMjg0ZTQ2NGE3YjkzNSIsInBhcmFtcyI6eyJyZXF1ZXN0ZWRfY2FwYWJpbGl0eSI6Im1jcF9tZXNzYWdlX2V4Y2hhbmdlIiwic2FmZXR5Ijoibm8gc2Vj",
+      "encoding": "base64url-canonical-json",
+      "frame_count": 3,
+      "frame_hash": "ee5aace7b99b2be9a830d6d78bc14a1478759655f878baf3195cbb3a826eb502",
+      "frame_index": 0,
+      "parent_payload_hash": "e87ee14c3dd3a59510b785a2c8983e48e274b372ca32a8a02a35798c119ae245",
+      "protocol": "UVIP-QSOM-VISUAL",
+      "schema": "uvip_qsom_visual_frame.v1",
+      "symbol_mode": "wave-bar-sphere"
+    },
+    {
+      "created_at": "2026-05-29T06:28:59.373738+00:00",
+      "data": "cmV0czsgcmVjZWl2ZXIgbXVzdCBhdXRob3JpemUgZGVjb2RlZCBtZXRob2RzIiwidHJhbnNwb3J0IjoidmlzdWFsLW9ubHkifSwicGF5bG9hZF9oYXNoIjoiZTg3ZWUxNGMzZGQzYTU5NTEwYjc4NWEyYzg5ODNlNDhlMjc0YjM3MmNhMzJhOGEwMmEzNTc5OGMxMTlhZTI0NSIsInByb3RvY29sIjoiVVZJUC1RU09NLU1DUCIsInByb3RvY29sX3ZlcnNpb24iOiIwLjEuMCIsInJlY2VpdmVyX2lkIjoibWNwLnNlcnZlci52aXN1YWwucmVjZWl2ZXIiLCJyZXBseV9jaGFubmVsX2hpbnQiOiJ2aXN1YWwtcmV0dXJuLWZyYW1lIiwic2NoZW1hIjoidXZpcF9xc29t",
+      "encoding": "base64url-canonical-json",
+      "frame_count": 3,
+      "frame_hash": "ad66df64cbc340c0f27cb19449d38a00c04d901a9eff1f5212713c537366c39e",
+      "frame_index": 1,
+      "parent_payload_hash": "e87ee14c3dd3a59510b785a2c8983e48e274b372ca32a8a02a35798c119ae245",
+      "protocol": "UVIP-QSOM-VISUAL",
+      "schema": "uvip_qsom_visual_frame.v1",
+      "symbol_mode": "wave-bar-sphere"
+    },
+    {
+      "created_at": "2026-05-29T06:28:59.373772+00:00",
+      "data": "X21jcF9lbnZlbG9wZS52MSIsInNlbmRlcl9pZCI6InV2aXAtcXNvbS5zZW5kZXIubG9jYWwiLCJzZXNzaW9uX2lkIjoic2Vzc2lvbi1iNmY3ZDAxMmY0NzczNzJlIiwidHJhbnNwb3J0X2JvdW5kYXJ5IjoiVmlzdWFsLW9ubHkgdHJhbnNtaXNzaW9uIHNob3VsZCBiZSB0cmVhdGVkIGFzIHVudHJ1c3RlZCBpbnB1dCB1bnRpbCBkZWNvZGVkLCBoYXNoLWNoZWNrZWQsIGFuZCBwb2xpY3ktYXV0aG9yaXplZC4ifQ",
+      "encoding": "base64url-canonical-json",
+      "frame_count": 3,
+      "frame_hash": "fd826e2ae04d693f37ef98330577186774ef01b3f67328dbdc0b8bd1abb38e33",
+      "frame_index": 2,
+      "parent_payload_hash": "e87ee14c3dd3a59510b785a2c8983e48e274b372ca32a8a02a35798c119ae245",
+      "protocol": "UVIP-QSOM-VISUAL",
+      "schema": "uvip_qsom_visual_frame.v1",
+      "symbol_mode": "wave-bar-sphere"
+    }
+  ],
+  "payload": {
+    "created_at": "2026-05-29T06:28:59.373113+00:00",
+    "evidence_boundary": "Visual MCP envelope only; does not authorize tool execution by itself.",
+    "message_id": "msg-b192c3f5e1d9e886",
+    "method": "tools/list",
+    "nonce": "0e2e6152e344555212c284e464a7b935",
+    "params": {
+      "requested_capability": "mcp_message_exchange",
+      "safety": "no secrets; receiver must authorize decoded methods",
+      "transport": "visual-only"
+    },
+    "payload_hash": "e87ee14c3dd3a59510b785a2c8983e48e274b372ca32a8a02a35798c119ae245",
+    "protocol": "UVIP-QSOM-MCP",
+    "protocol_version": "0.1.0",
+    "receiver_id": "mcp.server.visual.receiver",
+    "reply_channel_hint": "visual-return-frame",
+    "schema": "uvip_qsom_mcp_envelope.v1",
+    "sender_id": "uvip-qsom.sender.local",
+    "session_id": "session-b6f7d012f477372e",
+    "transport_boundary": "Visual-only transmission should be treated as untrusted input until decoded, hash-checked, and policy-authorized."
+  }
+}
