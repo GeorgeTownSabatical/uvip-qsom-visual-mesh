@@ -19,6 +19,8 @@ The first implementation provides:
 - scanner/receiver support for JSON, SVG metadata, and HTML metadata,
 - tamper detection through payload and frame hashes.
 - browser alpha screen-to-camera optical transport.
+- adaptive receiver thresholding calibrated from finder patterns.
+- Python reference interpreter for finder confidence and repeated-frame majority voting.
 
 ## What It Is Not
 

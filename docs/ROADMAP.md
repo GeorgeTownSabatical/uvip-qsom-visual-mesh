@@ -14,7 +14,9 @@
 - Browser sender and receiver pages.
 - Camera input prototype with Canvas sampling.
 - Reed-Solomon or fountain-code style redundancy.
- - Perspective correction and adaptive thresholding.
+- Perspective correction and stronger adaptive thresholding.
+- Majority-vote repeated camera captures in the browser receiver.
+- Forward error correction beyond CRC detection.
 
 ## v0.3
 

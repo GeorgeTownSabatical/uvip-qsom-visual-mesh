@@ -39,6 +39,8 @@ It validates:
 - frame sequence completeness,
 - reassembled frame payload hash.
 
+Scan reports are passive. They must never execute MCP tools. Reports surface `authorization_required: true` and copy the envelope guidance fields `allowed_methods`, `policy_hint`, `ttl_seconds`, and `expires_at` so a caller can make an explicit local authorization decision.
+
 ## Camera Optical Alpha
 
 The browser optical transport adds:
@@ -64,6 +66,16 @@ Decoded messages are untrusted input. A real MCP server must still apply:
 - authentication/authorization outside the visual channel,
 - rate limits,
 - replay protection through `session_id`, `message_id`, and `nonce`.
+
+Each visual MCP envelope includes:
+
+- `authorization_required: true`,
+- `allowed_methods`, the sender's declared method scope for policy comparison,
+- `policy_hint`, a human- and machine-readable local policy selector,
+- `ttl_seconds` and `expires_at`, bounded replay guidance,
+- `nonce`, `session_id`, and `message_id`, replay correlation fields.
+
+These fields are guidance and evidence for the receiver. They do not authorize execution by themselves, and they do not replace receiver-side policy, replay caches, authentication, or operator approval where required.
 
 ## No Secrets
 

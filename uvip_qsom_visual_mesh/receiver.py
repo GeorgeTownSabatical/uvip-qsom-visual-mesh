@@ -45,6 +45,11 @@ def _metadata_report(path: Path, source_kind: str, metadata: dict[str, Any]) -> 
         "message_id": payload.get("message_id", ""),
         "sender_id": payload.get("sender_id", ""),
         "receiver_id": payload.get("receiver_id", ""),
+        "authorization_required": True,
+        "allowed_methods": payload.get("allowed_methods", []),
+        "policy_hint": payload.get("policy_hint", ""),
+        "ttl_seconds": payload.get("ttl_seconds", ""),
+        "expires_at": payload.get("expires_at", ""),
         "frame_count": len(frames),
         "errors": errors,
         "transport_boundary": "Decoded visual input is untrusted until caller authorizes the MCP method and params.",
@@ -107,10 +112,14 @@ def scan_path(path: Path) -> dict[str, Any]:
             "message_id": "",
             "sender_id": "",
             "receiver_id": "",
+            "authorization_required": True,
+            "allowed_methods": [],
+            "policy_hint": "",
+            "ttl_seconds": "",
+            "expires_at": "",
             "frame_count": 0,
             "errors": [str(exc)],
             "transport_boundary": "Decode failed before MCP authorization.",
             "payload": {},
         }
     raise ValueError(f"Unsupported scan path: {path}")
-

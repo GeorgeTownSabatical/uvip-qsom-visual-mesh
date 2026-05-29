@@ -25,6 +25,7 @@ AI / MCP client A
 - A camera or screen-capture path on the receiver side.
 - Enough frame visibility for the receiver to sample the optical grid.
 - Receiver-side policy authorization before any decoded MCP method is executed.
+- A receiver replay cache or review process for `session_id`, `message_id`, `nonce`, `ttl_seconds`, and `expires_at`.
 
 ## Security Model
 
@@ -37,9 +38,12 @@ Decoded frames must still pass:
 - per-frame CRC checks,
 - payload hash checks,
 - replay checks using `session_id`, `message_id`, and `nonce`,
+- expiry checks using `ttl_seconds` and `expires_at`,
 - MCP method allowlists,
 - parameter validation,
 - local authorization policy.
+
+Decoded visual MCP envelopes and scanner reports include `authorization_required: true`. They may include `allowed_methods` and `policy_hint` to help choose a local policy path, but those fields are not authority. The receiver must treat them as untrusted guidance and must not execute tools until local policy authorizes the method and parameters.
 
 ## No Secrets
 
@@ -63,6 +67,6 @@ docs/optical-network/index.html
 3. Receiver opens the same page and starts camera receiver.
 4. Receiver points camera at sender display.
 5. Receiver reconstructs the MCP envelope and presents it for authorization.
+6. Receiver checks replay/expiry guidance and local method policy before any MCP execution.
 
 This allows disconnected systems to exchange structured messages without a network path.
-

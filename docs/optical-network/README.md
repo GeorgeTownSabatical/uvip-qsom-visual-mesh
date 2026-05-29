@@ -19,9 +19,10 @@ https://georgetownsabatical.github.io/uvip-qsom-visual-mesh/optical-network/
 ## Current Capabilities
 
 - Browser sender renders animated high-contrast optical frames.
-- Browser receiver uses `getUserMedia`, canvas sampling, and frame checksums.
+- Browser receiver uses `getUserMedia`, canvas sampling, finder-calibrated adaptive thresholding, and frame checksums.
 - MCP envelope is split into optical frames and reconstructed after all frames are captured.
 - Still-canvas mode validates the codec without a camera.
+- Python reference interpreter scores finder confidence and can majority-vote repeated captures of the same frame.
 
 ## Physical Use
 
@@ -33,6 +34,6 @@ https://georgetownsabatical.github.io/uvip-qsom-visual-mesh/optical-network/
 
 ## Boundary
 
-This is an alpha optical receiver. It assumes the sender square mostly fills the receiver guide and is not heavily rotated or warped. It validates frame magic, version, sequence, payload length, and CRC32 before reconstructing the MCP envelope.
+This is an alpha optical receiver. It assumes the sender square mostly fills the receiver guide and is not heavily rotated or warped. It validates frame magic, version, finder confidence, sequence, payload length, and CRC32 before reconstructing the MCP envelope.
 
 Decoded messages are still untrusted input. An MCP server must independently authorize method and params.

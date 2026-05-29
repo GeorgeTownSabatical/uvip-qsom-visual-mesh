@@ -62,6 +62,13 @@ const QSOM = (() => {
     return 1;
   }
 
+  function expectedFinderValue(row, col) {
+    if (row < FINDER_SIZE && col < FINDER_SIZE) return finderValue(row, col);
+    if (row < FINDER_SIZE && col >= GRID_SIZE - FINDER_SIZE) return finderValue(row, col - (GRID_SIZE - FINDER_SIZE));
+    if (row >= GRID_SIZE - FINDER_SIZE && col < FINDER_SIZE) return finderValue(row - (GRID_SIZE - FINDER_SIZE), col);
+    return null;
+  }
+
   function bytesToBits(bytes) {
     const bits = [];
     for (const byte of bytes) {
@@ -149,6 +156,135 @@ const QSOM = (() => {
     return decodeFrameBytes(bitsToBytes(bits));
   }
 
+  function luminanceOf(sample) {
+    return 0.2126 * sample.r + 0.7152 * sample.g + 0.0722 * sample.b;
+  }
+
+  function rgbDistance(a, b) {
+    const dr = a.r - b.r;
+    const dg = a.g - b.g;
+    const db = a.b - b.b;
+    return Math.sqrt(dr * dr + dg * dg + db * db);
+  }
+
+  function clamp01(value) {
+    if (!Number.isFinite(value)) return 0;
+    return Math.max(0, Math.min(1, value));
+  }
+
+  function median(values) {
+    if (!values.length) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    const middle = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+  }
+
+  function medianRgb(samples) {
+    return {
+      r: median(samples.map(sample => sample.r)),
+      g: median(samples.map(sample => sample.g)),
+      b: median(samples.map(sample => sample.b))
+    };
+  }
+
+  function normalizeCellSample(sample) {
+    if (Array.isArray(sample) || ArrayBuffer.isView(sample)) {
+      return { r: sample[0] || 0, g: sample[1] || 0, b: sample[2] || 0 };
+    }
+    return { r: sample.r || 0, g: sample.g || 0, b: sample.b || 0 };
+  }
+
+  function finderReferences(samples) {
+    const dark = [];
+    const light = [];
+    for (let row = 0; row < GRID_SIZE; row++) {
+      for (let col = 0; col < GRID_SIZE; col++) {
+        const expected = expectedFinderValue(row, col);
+        if (expected === null) continue;
+        (expected ? dark : light).push(samples[row][col]);
+      }
+    }
+    if (!dark.length || !light.length) throw new Error("Finder references unavailable");
+    const darkRgb = medianRgb(dark);
+    const lightRgb = medianRgb(light);
+    return {
+      dark: { ...darkRgb, luminance: luminanceOf(darkRgb) },
+      light: { ...lightRgb, luminance: luminanceOf(lightRgb) }
+    };
+  }
+
+  function inkScore(sample, references) {
+    const luminanceSpan = Math.max(1, references.light.luminance - references.dark.luminance);
+    const luminanceScore = clamp01((references.light.luminance - luminanceOf(sample)) / luminanceSpan);
+    const lightDistance = rgbDistance(sample, references.light);
+    const darkDistance = rgbDistance(sample, references.dark);
+    const distanceScore = lightDistance + darkDistance > 0 ? lightDistance / (lightDistance + darkDistance) : luminanceScore;
+    const saturationScore = (Math.max(sample.r, sample.g, sample.b) - Math.min(sample.r, sample.g, sample.b)) / 255;
+    return clamp01(0.6 * luminanceScore + 0.25 * distanceScore + 0.15 * saturationScore);
+  }
+
+  function otsuThreshold(scores) {
+    if (!scores.length) return null;
+    const bins = 64;
+    const histogram = Array(bins).fill(0);
+    for (const score of scores) histogram[Math.max(0, Math.min(bins - 1, Math.floor(clamp01(score) * (bins - 1))))]++;
+    let total = 0;
+    let weightedTotal = 0;
+    for (let i = 0; i < bins; i++) {
+      total += histogram[i];
+      weightedTotal += i * histogram[i];
+    }
+    let backgroundWeight = 0;
+    let backgroundSum = 0;
+    let bestVariance = -1;
+    let bestIndex = Math.floor(bins / 2);
+    for (let i = 0; i < bins; i++) {
+      backgroundWeight += histogram[i];
+      if (!backgroundWeight) continue;
+      const foregroundWeight = total - backgroundWeight;
+      if (!foregroundWeight) break;
+      backgroundSum += i * histogram[i];
+      const backgroundMean = backgroundSum / backgroundWeight;
+      const foregroundMean = (weightedTotal - backgroundSum) / foregroundWeight;
+      const variance = backgroundWeight * foregroundWeight * (backgroundMean - foregroundMean) ** 2;
+      if (variance > bestVariance) {
+        bestVariance = variance;
+        bestIndex = i;
+      }
+    }
+    return (bestIndex + 0.5) / bins;
+  }
+
+  function thresholdFromScores(scores) {
+    const finderDarkScores = [];
+    const finderLightScores = [];
+    for (let row = 0; row < GRID_SIZE; row++) {
+      for (let col = 0; col < GRID_SIZE; col++) {
+        const expected = expectedFinderValue(row, col);
+        if (expected === null) continue;
+        (expected ? finderDarkScores : finderLightScores).push(scores[row][col]);
+      }
+    }
+    const lightAnchor = median(finderLightScores);
+    const darkAnchor = median(finderDarkScores);
+    const anchorThreshold = (lightAnchor + darkAnchor) / 2;
+    const dataScores = POSITIONS.map(([row, col]) => scores[row][col]);
+    const adaptiveThreshold = otsuThreshold(dataScores);
+    if (adaptiveThreshold === null) return anchorThreshold;
+    const lower = Math.min(lightAnchor, darkAnchor) + 0.03;
+    const upper = Math.max(lightAnchor, darkAnchor) - 0.03;
+    if (upper <= lower) return anchorThreshold;
+    return Math.max(lower, Math.min(upper, adaptiveThreshold));
+  }
+
+  function cellSamplesToMatrix(cellSamples) {
+    const samples = cellSamples.map(row => row.map(normalizeCellSample));
+    const references = finderReferences(samples);
+    const scores = samples.map(row => row.map(sample => inkScore(sample, references)));
+    const threshold = thresholdFromScores(scores);
+    return scores.map(row => row.map(score => score >= threshold ? 1 : 0));
+  }
+
   function encodeOpticalFrames(payload) {
     const encoded = b64urlFromBytes(utf8Bytes(JSON.stringify(payload)));
     const bytes = utf8Bytes(encoded);
@@ -202,17 +338,16 @@ const QSOM = (() => {
     const startX = (canvas.width - size) / 2;
     const startY = (canvas.height - size) / 2;
     const cell = size / GRID_SIZE;
-    const matrix = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(0));
+    const samples = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(null));
     for (let row = 0; row < GRID_SIZE; row++) {
       for (let col = 0; col < GRID_SIZE; col++) {
         const x = Math.floor(startX + (col + 0.5) * cell);
         const y = Math.floor(startY + (row + 0.5) * cell);
         const [r, g, b] = ctx.getImageData(x, y, 1, 1).data;
-        const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-        matrix[row][col] = luminance < 190 ? 1 : 0;
+        samples[row][col] = { r, g, b };
       }
     }
-    return matrix;
+    return cellSamplesToMatrix(samples);
   }
 
   function senderPayload() {
@@ -237,6 +372,7 @@ const QSOM = (() => {
 
   return {
     GRID_SIZE,
+    cellSamplesToMatrix,
     decodeOpticalFrames,
     drawMatrix,
     encodeOpticalFrames,
