@@ -157,10 +157,10 @@
 
     function scanCanvas(canvas) {
       const bounds = QSOM.detectOpticalBounds(canvas);
-      drawBounds(bounds);
       const matrix = QSOM.sampleCanvasToMatrix(canvas, { bounds });
       const frame = QSOM.frameFromMatrix(matrix);
       acceptFrame(frame);
+      return bounds;
     }
 
     function scanVideo() {
@@ -180,7 +180,12 @@
       try {
         const ctx = captureCanvas.getContext("2d");
         ctx.drawImage(sendCanvas, 0, 0, captureCanvas.width, captureCanvas.height);
-        scanCanvas(captureCanvas);
+        const offscreen = document.createElement("canvas");
+        offscreen.width = captureCanvas.width;
+        offscreen.height = captureCanvas.height;
+        offscreen.getContext("2d").drawImage(captureCanvas, 0, 0);
+        const bounds = scanCanvas(offscreen);
+        drawBounds(bounds);
       } catch (error) {
         recvStatus.textContent = `Still scan failed: ${error.message}`;
       }
