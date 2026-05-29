@@ -51,7 +51,7 @@
       <pre id="decoded">{}</pre>
     </section>
   </main>
-  <script src="optical.js"></script>
+  <script src="optical.js?v=20260529-finder-localization"></script>
   <script>
     const sendCanvas = document.getElementById("sendCanvas");
     const captureCanvas = document.getElementById("captureCanvas");
@@ -65,6 +65,12 @@
     let senderIndex = 0;
     let scanTimer = null;
     const captured = new Map();
+
+    if (!QSOM.detectOpticalBounds) {
+      recvStatus.textContent = "Receiver script cache is stale. Hard refresh this page to load the finder-localization decoder.";
+      locateStatus.textContent = "Missing detectOpticalBounds export from optical.js.";
+      throw new Error("Stale optical.js: detectOpticalBounds is unavailable");
+    }
 
     function prepareFrames() {
       const payload = QSOM.senderPayload();
