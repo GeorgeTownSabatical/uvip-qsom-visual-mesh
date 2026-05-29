@@ -18,6 +18,7 @@
     video { background: #000; }
     pre { overflow-x: auto; max-height: 320px; background: #020617; color: #dbeafe; border-radius: 8px; padding: 12px; }
     .status { min-height: 24px; color: #fef3c7; }
+    .hint { color: #93c5fd; font-size: 14px; }
     @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -42,6 +43,7 @@
         <video id="video" playsinline muted></video>
         <canvas id="captureCanvas" width="820" height="820"></canvas>
         <p id="recvStatus" class="status">Receiver idle.</p>
+        <p id="locateStatus" class="hint">Finder localization idle.</p>
       </section>
     </div>
     <section class="panel">
@@ -56,6 +58,7 @@
     const video = document.getElementById("video");
     const sendStatus = document.getElementById("sendStatus");
     const recvStatus = document.getElementById("recvStatus");
+    const locateStatus = document.getElementById("locateStatus");
     const decoded = document.getElementById("decoded");
     let frames = [];
     let senderTimer = null;
@@ -114,6 +117,24 @@
       ctx.strokeRect(10, 10, captureCanvas.width - 20, captureCanvas.height - 20);
     }
 
+    function drawBounds(bounds) {
+      const ctx = captureCanvas.getContext("2d");
+      if (!bounds) {
+        locateStatus.textContent = "No finder triplet localized; using center crop.";
+        return;
+      }
+      ctx.save();
+      ctx.strokeStyle = "#22c55e";
+      ctx.lineWidth = 5;
+      ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+      ctx.fillStyle = "#22c55e";
+      for (const finder of bounds.finders || []) {
+        ctx.strokeRect(finder.x, finder.y, finder.size, finder.size);
+      }
+      ctx.restore();
+      locateStatus.textContent = `Finder localization confidence ${bounds.confidence.toFixed(2)}.`;
+    }
+
     function acceptFrame(frame) {
       captured.set(frame.index, frame);
       recvStatus.textContent = `Captured ${captured.size}/${frame.count} frame(s).`;
@@ -129,7 +150,9 @@
     }
 
     function scanCanvas(canvas) {
-      const matrix = QSOM.sampleCanvasToMatrix(canvas);
+      const bounds = QSOM.detectOpticalBounds(canvas);
+      drawBounds(bounds);
+      const matrix = QSOM.sampleCanvasToMatrix(canvas, { bounds });
       const frame = QSOM.frameFromMatrix(matrix);
       acceptFrame(frame);
     }

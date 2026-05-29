@@ -285,6 +285,130 @@ const QSOM = (() => {
     return scores.map(row => row.map(score => score >= threshold ? 1 : 0));
   }
 
+  function integralLuminance(imageData) {
+    const { width, height, data } = imageData;
+    const integral = new Float64Array((width + 1) * (height + 1));
+    for (let y = 1; y <= height; y++) {
+      let rowSum = 0;
+      for (let x = 1; x <= width; x++) {
+        const offset = ((y - 1) * width + (x - 1)) * 4;
+        rowSum += 0.2126 * data[offset] + 0.7152 * data[offset + 1] + 0.0722 * data[offset + 2];
+        integral[y * (width + 1) + x] = integral[(y - 1) * (width + 1) + x] + rowSum;
+      }
+    }
+    return { integral, width, height };
+  }
+
+  function rectMean(integralData, x, y, width, height) {
+    const imageWidth = integralData.width + 1;
+    const x1 = Math.max(0, Math.min(integralData.width, Math.floor(x)));
+    const y1 = Math.max(0, Math.min(integralData.height, Math.floor(y)));
+    const x2 = Math.max(x1 + 1, Math.min(integralData.width, Math.ceil(x + width)));
+    const y2 = Math.max(y1 + 1, Math.min(integralData.height, Math.ceil(y + height)));
+    const area = (x2 - x1) * (y2 - y1);
+    const sum =
+      integralData.integral[y2 * imageWidth + x2] -
+      integralData.integral[y1 * imageWidth + x2] -
+      integralData.integral[y2 * imageWidth + x1] +
+      integralData.integral[y1 * imageWidth + x1];
+    return sum / area;
+  }
+
+  function finderScore(integralData, x, y, size) {
+    const cell = size / FINDER_SIZE;
+    const dark = [];
+    const light = [];
+    for (let row = 0; row < FINDER_SIZE; row++) {
+      for (let col = 0; col < FINDER_SIZE; col++) {
+        const mean = rectMean(integralData, x + col * cell, y + row * cell, cell, cell);
+        (finderValue(row, col) ? dark : light).push(mean);
+      }
+    }
+    const darkMean = dark.reduce((sum, value) => sum + value, 0) / dark.length;
+    const lightMean = light.reduce((sum, value) => sum + value, 0) / light.length;
+    const contrast = lightMean - darkMean;
+    if (contrast < 34) return 0;
+    let error = 0;
+    for (const value of dark) error += Math.max(0, value - (darkMean + contrast * 0.42));
+    for (const value of light) error += Math.max(0, (lightMean - contrast * 0.42) - value);
+    return contrast - error / (dark.length + light.length);
+  }
+
+  function overlaps(a, b) {
+    return !(a.x + a.size < b.x || b.x + b.size < a.x || a.y + a.size < b.y || b.y + b.size < a.y);
+  }
+
+  function bestFinderTriplet(candidates) {
+    let best = null;
+    for (let i = 0; i < candidates.length; i++) {
+      for (let j = 0; j < candidates.length; j++) {
+        for (let k = 0; k < candidates.length; k++) {
+          if (i === j || i === k || j === k) continue;
+          const tl = candidates[i];
+          const tr = candidates[j];
+          const bl = candidates[k];
+          if (!(tr.x > tl.x && bl.y > tl.y)) continue;
+          const finderSize = (tl.size + tr.size + bl.size) / 3;
+          const dx = tr.x - tl.x;
+          const dy = bl.y - tl.y;
+          if (dx < finderSize * 2.8 || dy < finderSize * 2.8) continue;
+          const ySkew = Math.abs(tr.y - tl.y) / dy;
+          const xSkew = Math.abs(bl.x - tl.x) / dx;
+          const aspectSkew = Math.abs(dx - dy) / Math.max(dx, dy);
+          if (ySkew > 0.26 || xSkew > 0.26 || aspectSkew > 0.34) continue;
+          const geometry = 1 - Math.min(1, ySkew + xSkew + aspectSkew);
+          const score = (tl.score + tr.score + bl.score) * geometry;
+          if (!best || score > best.score) best = { tl, tr, bl, finderSize, score };
+        }
+      }
+    }
+    return best;
+  }
+
+  function detectOpticalBounds(canvas, options = {}) {
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    return detectOpticalBoundsFromImageData(imageData, options);
+  }
+
+  function detectOpticalBoundsFromImageData(imageData, options = {}) {
+    const integral = integralLuminance(imageData);
+    const minSize = options.minFinderSize || Math.max(16, Math.floor(Math.min(imageData.width, imageData.height) * 0.035));
+    const maxSize = options.maxFinderSize || Math.max(minSize + 2, Math.floor(Math.min(imageData.width, imageData.height) * 0.24));
+    const candidates = [];
+    for (let size = minSize; size <= maxSize; size += Math.max(2, Math.floor(size * 0.16))) {
+      const step = Math.max(4, Math.floor(size * 0.34));
+      for (let y = 0; y <= imageData.height - size; y += step) {
+        for (let x = 0; x <= imageData.width - size; x += step) {
+          const score = finderScore(integral, x, y, size);
+          if (score > 26) candidates.push({ x, y, size, score });
+        }
+      }
+    }
+    candidates.sort((a, b) => b.score - a.score);
+    const kept = [];
+    for (const candidate of candidates) {
+      if (kept.some(existing => overlaps(existing, candidate))) continue;
+      kept.push(candidate);
+      if (kept.length >= 18) break;
+    }
+    const triplet = bestFinderTriplet(kept);
+    if (!triplet) return null;
+    const left = Math.max(0, Math.min(triplet.tl.x, triplet.bl.x));
+    const top = Math.max(0, Math.min(triplet.tl.y, triplet.tr.y));
+    const width = Math.min(imageData.width - left, Math.max(triplet.tr.x - left + triplet.finderSize, triplet.bl.x - left + triplet.finderSize));
+    const height = Math.min(imageData.height - top, Math.max(triplet.bl.y - top + triplet.finderSize, triplet.tr.y - top + triplet.finderSize));
+    const pad = Math.max(2, Math.min(width, height) * 0.015);
+    return {
+      x: Math.max(0, left - pad),
+      y: Math.max(0, top - pad),
+      width: Math.min(imageData.width - Math.max(0, left - pad), width + pad * 2),
+      height: Math.min(imageData.height - Math.max(0, top - pad), height + pad * 2),
+      confidence: Math.max(0, Math.min(1, triplet.score / 210)),
+      finders: [triplet.tl, triplet.tr, triplet.bl]
+    };
+  }
+
   function encodeOpticalFrames(payload) {
     const encoded = b64urlFromBytes(utf8Bytes(JSON.stringify(payload)));
     const bytes = utf8Bytes(encoded);
@@ -332,17 +456,24 @@ const QSOM = (() => {
     ctx.restore();
   }
 
-  function sampleCanvasToMatrix(canvas) {
+  function sampleCanvasToMatrix(canvas, options = {}) {
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const detected = options.bounds || (options.autoLocate === false ? null : detectOpticalBounds(canvas, options));
     const size = Math.min(canvas.width, canvas.height);
-    const startX = (canvas.width - size) / 2;
-    const startY = (canvas.height - size) / 2;
-    const cell = size / GRID_SIZE;
+    const fallback = {
+      x: (canvas.width - size) / 2,
+      y: (canvas.height - size) / 2,
+      width: size,
+      height: size
+    };
+    const bounds = detected || fallback;
+    const cellW = bounds.width / GRID_SIZE;
+    const cellH = bounds.height / GRID_SIZE;
     const samples = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(null));
     for (let row = 0; row < GRID_SIZE; row++) {
       for (let col = 0; col < GRID_SIZE; col++) {
-        const x = Math.floor(startX + (col + 0.5) * cell);
-        const y = Math.floor(startY + (row + 0.5) * cell);
+        const x = Math.floor(bounds.x + (col + 0.5) * cellW);
+        const y = Math.floor(bounds.y + (row + 0.5) * cellH);
         const [r, g, b] = ctx.getImageData(x, y, 1, 1).data;
         samples[row][col] = { r, g, b };
       }
@@ -374,6 +505,8 @@ const QSOM = (() => {
     GRID_SIZE,
     cellSamplesToMatrix,
     decodeOpticalFrames,
+    detectOpticalBounds,
+    detectOpticalBoundsFromImageData,
     drawMatrix,
     encodeOpticalFrames,
     frameFromMatrix,
