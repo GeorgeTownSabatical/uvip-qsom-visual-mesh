@@ -241,6 +241,16 @@
       }
     }
 
+    function clearTrackedZoom(message = "Waiting for confirmed sender image") {
+      const ctx = captureCanvas.getContext("2d");
+      ctx.fillStyle = "#07111f";
+      ctx.fillRect(0, 0, captureCanvas.width, captureCanvas.height);
+      ctx.fillStyle = "#93c5fd";
+      ctx.font = "28px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(message, captureCanvas.width / 2, captureCanvas.height / 2);
+    }
+
     function acceptFrame(frame) {
       captured.set(frame.index, frame);
       recvStatus.textContent = `Captured ${captured.size}/${frame.count} frame(s).`;
@@ -260,18 +270,18 @@
       const matrix = QSOM.sampleCanvasToMatrix(canvas, { bounds });
       const frame = QSOM.frameFromMatrix(matrix);
       acceptFrame(frame);
-      return bounds;
+      return { bounds, frame };
     }
 
     function scanVideo() {
       drawVideoToAnalysis();
       try {
-        const bounds = scanCanvas(analysisCanvas);
+        const { bounds } = scanCanvas(analysisCanvas);
         drawVideoOverlay(bounds);
         drawTrackedZoom(analysisCanvas, bounds, video);
       } catch (error) {
         drawVideoOverlay(null);
-        drawTrackedZoom(analysisCanvas, null);
+        clearTrackedZoom();
         recvStatus.textContent = `Scanning: ${error.message}`;
       }
     }
@@ -286,16 +296,18 @@
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, analysisCanvas.width, analysisCanvas.height);
         ctx.drawImage(sendCanvas, 0, 0, analysisCanvas.width, analysisCanvas.height);
-        const bounds = scanCanvas(analysisCanvas);
+        const { bounds } = scanCanvas(analysisCanvas);
         drawVideoOverlay(null);
         drawTrackedZoom(analysisCanvas, bounds);
       } catch (error) {
+        clearTrackedZoom();
         recvStatus.textContent = `Still scan failed: ${error.message}`;
       }
     });
 
     prepareFrames();
     drawNextFrame();
+    clearTrackedZoom();
   </script>
 </body>
 </html>
