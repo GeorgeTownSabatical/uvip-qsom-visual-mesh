@@ -16,6 +16,8 @@
     .panel { border: 1px solid #263445; border-radius: 8px; background: #0d1b2d; padding: 12px; }
     canvas, video { width: 100%; border-radius: 8px; background: #fff; display: block; }
     video { background: #000; }
+    .video-stage { position: relative; width: 100%; }
+    .video-stage canvas { position: absolute; inset: 0; background: transparent; pointer-events: none; }
     pre { overflow-x: auto; max-height: 320px; background: #020617; color: #dbeafe; border-radius: 8px; padding: 12px; }
     .status { min-height: 24px; color: #fef3c7; }
     .hint { color: #93c5fd; font-size: 14px; }
@@ -40,7 +42,10 @@
       </section>
       <section class="panel">
         <h2>Receiver</h2>
-        <video id="video" playsinline muted></video>
+        <div class="video-stage">
+          <video id="video" playsinline muted></video>
+          <canvas id="videoOverlay" width="820" height="462"></canvas>
+        </div>
         <canvas id="captureCanvas" width="820" height="820"></canvas>
         <p id="recvStatus" class="status">Receiver idle.</p>
         <p id="locateStatus" class="hint">Finder localization idle.</p>
@@ -55,7 +60,11 @@
   <script>
     const sendCanvas = document.getElementById("sendCanvas");
     const captureCanvas = document.getElementById("captureCanvas");
+    const analysisCanvas = document.createElement("canvas");
+    analysisCanvas.width = 820;
+    analysisCanvas.height = 820;
     const video = document.getElementById("video");
+    const videoOverlay = document.getElementById("videoOverlay");
     const sendStatus = document.getElementById("sendStatus");
     const recvStatus = document.getElementById("recvStatus");
     const locateStatus = document.getElementById("locateStatus");
@@ -108,37 +117,85 @@
       scanTimer = setInterval(scanVideo, 350);
     }
 
-    function drawVideoToCapture() {
-      const ctx = captureCanvas.getContext("2d", { willReadFrequently: true });
+    function syncOverlaySize() {
+      const rect = video.getBoundingClientRect();
+      const scale = window.devicePixelRatio || 1;
+      const width = Math.max(1, Math.round(rect.width * scale));
+      const height = Math.max(1, Math.round(rect.height * scale));
+      if (videoOverlay.width !== width || videoOverlay.height !== height) {
+        videoOverlay.width = width;
+        videoOverlay.height = height;
+      }
+    }
+
+    function drawVideoToAnalysis() {
+      const ctx = analysisCanvas.getContext("2d", { willReadFrequently: true });
       ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, captureCanvas.width, captureCanvas.height);
+      ctx.fillRect(0, 0, analysisCanvas.width, analysisCanvas.height);
       if (video.videoWidth && video.videoHeight) {
         const side = Math.min(video.videoWidth, video.videoHeight);
         const sx = (video.videoWidth - side) / 2;
         const sy = (video.videoHeight - side) / 2;
-        ctx.drawImage(video, sx, sy, side, side, 0, 0, captureCanvas.width, captureCanvas.height);
+        ctx.drawImage(video, sx, sy, side, side, 0, 0, analysisCanvas.width, analysisCanvas.height);
       }
-      ctx.strokeStyle = "#f59e0b";
-      ctx.lineWidth = 8;
-      ctx.strokeRect(10, 10, captureCanvas.width - 20, captureCanvas.height - 20);
     }
 
-    function drawBounds(bounds) {
-      const ctx = captureCanvas.getContext("2d");
+    function drawVideoOverlay(bounds) {
+      syncOverlaySize();
+      const ctx = videoOverlay.getContext("2d");
+      ctx.clearRect(0, 0, videoOverlay.width, videoOverlay.height);
+      const overlaySize = Math.min(videoOverlay.width, videoOverlay.height);
+      const cropX = (videoOverlay.width - overlaySize) / 2;
+      const cropY = (videoOverlay.height - overlaySize) / 2;
+      ctx.save();
+      ctx.strokeStyle = "#f59e0b";
+      ctx.lineWidth = 4;
+      ctx.strokeRect(cropX + 6, cropY + 6, overlaySize - 12, overlaySize - 12);
       if (!bounds) {
         locateStatus.textContent = "No finder triplet localized; using center crop.";
+        ctx.restore();
         return;
       }
-      ctx.save();
+      const scaleX = overlaySize / analysisCanvas.width;
+      const scaleY = overlaySize / analysisCanvas.height;
       ctx.strokeStyle = "#22c55e";
       ctx.lineWidth = 5;
-      ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+      ctx.strokeRect(cropX + bounds.x * scaleX, cropY + bounds.y * scaleY, bounds.width * scaleX, bounds.height * scaleY);
       ctx.fillStyle = "#22c55e";
       for (const finder of bounds.finders || []) {
-        ctx.strokeRect(finder.x, finder.y, finder.size, finder.size);
+        ctx.strokeRect(cropX + finder.x * scaleX, cropY + finder.y * scaleY, finder.size * scaleX, finder.size * scaleY);
       }
       ctx.restore();
       locateStatus.textContent = `Finder localization confidence ${bounds.confidence.toFixed(2)}.`;
+    }
+
+    function drawTrackedZoom(sourceCanvas, bounds) {
+      const ctx = captureCanvas.getContext("2d");
+      ctx.fillStyle = "#07111f";
+      ctx.fillRect(0, 0, captureCanvas.width, captureCanvas.height);
+      const fallbackSize = Math.min(sourceCanvas.width, sourceCanvas.height);
+      const source = bounds || {
+        x: (sourceCanvas.width - fallbackSize) / 2,
+        y: (sourceCanvas.height - fallbackSize) / 2,
+        width: fallbackSize,
+        height: fallbackSize
+      };
+      const pad = Math.max(8, Math.min(source.width, source.height) * 0.18);
+      const sx = Math.max(0, source.x - pad);
+      const sy = Math.max(0, source.y - pad);
+      const sw = Math.min(sourceCanvas.width - sx, source.width + pad * 2);
+      const sh = Math.min(sourceCanvas.height - sy, source.height + pad * 2);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(sourceCanvas, sx, sy, sw, sh, 0, 0, captureCanvas.width, captureCanvas.height);
+      if (bounds) {
+        const scaleX = captureCanvas.width / sw;
+        const scaleY = captureCanvas.height / sh;
+        ctx.save();
+        ctx.strokeStyle = "#22c55e";
+        ctx.lineWidth = 8;
+        ctx.strokeRect((bounds.x - sx) * scaleX, (bounds.y - sy) * scaleY, bounds.width * scaleX, bounds.height * scaleY);
+        ctx.restore();
+      }
     }
 
     function acceptFrame(frame) {
@@ -164,10 +221,14 @@
     }
 
     function scanVideo() {
-      drawVideoToCapture();
+      drawVideoToAnalysis();
       try {
-        scanCanvas(captureCanvas);
+        const bounds = scanCanvas(analysisCanvas);
+        drawVideoOverlay(bounds);
+        drawTrackedZoom(analysisCanvas, bounds);
       } catch (error) {
+        drawVideoOverlay(null);
+        drawTrackedZoom(analysisCanvas, null);
         recvStatus.textContent = `Scanning: ${error.message}`;
       }
     }
@@ -178,14 +239,13 @@
 
     document.getElementById("scanStill").addEventListener("click", () => {
       try {
-        const ctx = captureCanvas.getContext("2d");
-        ctx.drawImage(sendCanvas, 0, 0, captureCanvas.width, captureCanvas.height);
-        const offscreen = document.createElement("canvas");
-        offscreen.width = captureCanvas.width;
-        offscreen.height = captureCanvas.height;
-        offscreen.getContext("2d").drawImage(captureCanvas, 0, 0);
-        const bounds = scanCanvas(offscreen);
-        drawBounds(bounds);
+        const ctx = analysisCanvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, analysisCanvas.width, analysisCanvas.height);
+        ctx.drawImage(sendCanvas, 0, 0, analysisCanvas.width, analysisCanvas.height);
+        const bounds = scanCanvas(analysisCanvas);
+        drawVideoOverlay(null);
+        drawTrackedZoom(analysisCanvas, bounds);
       } catch (error) {
         recvStatus.textContent = `Still scan failed: ${error.message}`;
       }
