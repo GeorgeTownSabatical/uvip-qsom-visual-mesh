@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UVIP/QSOM Camera Optical Network v3</title>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #07111f; color: #e5eefb; }
+    main { max-width: 1220px; margin: 0 auto; padding: 18px; }
+    h1 { margin: 0 0 8px; font-size: clamp(28px, 4vw, 56px); letter-spacing: 0; }
+    p { color: #b8c4d6; line-height: 1.45; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0; }
+    button { min-height: 42px; border: 0; border-radius: 6px; padding: 0 14px; font-weight: 750; color: #05111f; background: #6ee7b7; cursor: pointer; }
+    button.secondary { background: #bfdbfe; }
+    .grid { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr); gap: 16px; align-items: start; }
+    .panel { border: 1px solid #263445; border-radius: 8px; background: #0d1b2d; padding: 12px; }
+    canvas, video { width: 100%; border-radius: 8px; background: #fff; display: block; }
+    video { background: #000; }
+    .video-stage { position: relative; width: 100%; overflow: hidden; border-radius: 8px; background: #000; }
+    .video-stage video { border-radius: 8px; }
+    .video-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 8px; background: transparent; pointer-events: none; }
+    pre { overflow-x: auto; max-height: 320px; background: #020617; color: #dbeafe; border-radius: 8px; padding: 12px; }
+    .status { min-height: 24px; color: #fef3c7; }
+    .hint { color: #93c5fd; font-size: 14px; }
+    @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>UVIP/QSOM Camera Optical Network v3</h1>
+    <p>Versioned v3 screen-to-camera transport for MCP envelopes. Use two devices or two browser windows: one sends animated optical frames; the other receives through the camera. No secrets belong in this channel.</p>
+    <div class="toolbar">
+      <button id="startSender">Start Sender</button>
+      <button id="stopSender" class="secondary">Stop Sender</button>
+      <button id="startCamera">Start Camera Receiver</button>
+      <button id="scanStill" class="secondary">Scan Still Canvas</button>
+    </div>
+    <div class="grid">
+      <section class="panel">
+        <h2>Sender</h2>
+        <canvas id="sendCanvas" width="820" height="820"></canvas>
+        <p id="sendStatus" class="status">Sender idle.</p>
+      </section>
+      <section class="panel">
+        <h2>Receiver</h2>
+        <div class="video-stage">
+          <video id="video" playsinline muted></video>
+          <canvas id="videoOverlay" width="820" height="462"></canvas>
+        </div>
+        <canvas id="captureCanvas" width="820" height="820"></canvas>
+        <p id="recvStatus" class="status">Receiver idle.</p>
+        <p id="locateStatus" class="hint">Finder localization idle.</p>
+      </section>
+    </div>
+    <section class="panel">
+      <h2>Decoded MCP Envelope</h2>
+      <pre id="decoded">{}</pre>
+    </section>
+  </main>
+  <script src="optical-v3.js?v=20260529-v3-tracking"></script>
+  <script>
+    const sendCanvas = document.getElementById("sendCanvas");
+    const captureCanvas = document.getElementById("captureCanvas");
+    const analysisCanvas = document.createElement("canvas");
+    analysisCanvas.width = 820;
+    analysisCanvas.height = 820;
+    const video = document.getElementById("video");
+    const videoOverlay = document.getElementById("videoOverlay");
+    const sendStatus = document.getElementById("sendStatus");
+    const recvStatus = document.getElementById("recvStatus");
+    const locateStatus = document.getElementById("locateStatus");
+    const decoded = document.getElementById("decoded");
+    let frames = [];
+    let senderTimer = null;
+    let senderIndex = 0;
+    let scanTimer = null;
+    const captured = new Map();
+    let lastAnalysisMapping = null;
+
+    if (!QSOM.detectOpticalBounds) {
+      recvStatus.textContent = "Receiver script cache is stale. Hard refresh this page to load the finder-localization decoder.";
+      locateStatus.textContent = "Missing detectOpticalBounds export from optical-v3.js?v=20260529-v3-tracking.";
+      throw new Error("Stale optical-v3.js?v=20260529-v3-tracking: detectOpticalBounds is unavailable");
+    }
+
+    function prepareFrames() {
+      const payload = QSOM.senderPayload();
+      frames = QSOM.encodeOpticalFrames(payload);
+      sendStatus.textContent = `Prepared ${frames.length} optical frame(s) for ${payload.method}.`;
+    }
+
+    function drawNextFrame() {
+      if (!frames.length) prepareFrames();
+      const frame = frames[senderIndex % frames.length];
+      QSOM.drawMatrix(sendCanvas, frame.matrix);
+      sendStatus.textContent = `Sending frame ${frame.index + 1}/${frame.count}. Keep the square filling the receiver guide.`;
+      senderIndex += 1;
+    }
+
+    document.getElementById("startSender").addEventListener("click", () => {
+      prepareFrames();
+      drawNextFrame();
+      clearInterval(senderTimer);
+      senderTimer = setInterval(drawNextFrame, 420);
+    });
+
+    document.getElementById("stopSender").addEventListener("click", () => {
+      clearInterval(senderTimer);
+      senderTimer = null;
+      sendStatus.textContent = "Sender stopped.";
+    });
+
+    async function startCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: 1280, height: 720 }, audio: false });
+      video.srcObject = stream;
+      await video.play();
+      recvStatus.textContent = "Camera active. Center the sender square in the capture canvas.";
+      clearInterval(scanTimer);
+      scanTimer = setInterval(scanVideo, 350);
+    }
+
+    function syncOverlaySize() {
+      const rect = video.getBoundingClientRect();
+      const scale = window.devicePixelRatio || 1;
+      const width = Math.max(1, Math.round(rect.width * scale));
+      const height = Math.max(1, Math.round(rect.height * scale));
+      if (videoOverlay.width !== width || videoOverlay.height !== height) {
+        videoOverlay.width = width;
+        videoOverlay.height = height;
+      }
+    }
+
+    function drawVideoToAnalysis() {
+      const ctx = analysisCanvas.getContext("2d", { willReadFrequently: true });
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, analysisCanvas.width, analysisCanvas.height);
+      if (video.videoWidth && video.videoHeight) {
+        const side = Math.min(video.videoWidth, video.videoHeight);
+        const sx = (video.videoWidth - side) / 2;
+        const sy = (video.videoHeight - side) / 2;
+        ctx.drawImage(video, sx, sy, side, side, 0, 0, analysisCanvas.width, analysisCanvas.height);
+        lastAnalysisMapping = { sx, sy, side };
+      }
+    }
+
+    function analysisBoundsToVideoSource(bounds) {
+      if (!bounds || !lastAnalysisMapping) return null;
+      const scale = lastAnalysisMapping.side / analysisCanvas.width;
+      return {
+        x: lastAnalysisMapping.sx + bounds.x * scale,
+        y: lastAnalysisMapping.sy + bounds.y * scale,
+        width: bounds.width * scale,
+        height: bounds.height * scale
+      };
+    }
+
+    function analysisBoundsToDisplayedVideo(bounds) {
+      if (!bounds) return null;
+      const rect = video.getBoundingClientRect();
+      const overlayRect = videoOverlay.getBoundingClientRect();
+      const scale = window.devicePixelRatio || 1;
+      const displayedWidth = rect.width * scale;
+      const displayedHeight = rect.height * scale;
+      const offsetX = (overlayRect.width - rect.width) * scale / 2;
+      const offsetY = (overlayRect.height - rect.height) * scale / 2;
+      const square = Math.min(displayedWidth, displayedHeight);
+      return {
+        x: offsetX + (displayedWidth - square) / 2 + bounds.x * (square / analysisCanvas.width),
+        y: offsetY + (displayedHeight - square) / 2 + bounds.y * (square / analysisCanvas.height),
+        width: bounds.width * (square / analysisCanvas.width),
+        height: bounds.height * (square / analysisCanvas.height)
+      };
+    }
+
+    function drawVideoOverlay(bounds) {
+      syncOverlaySize();
+      const ctx = videoOverlay.getContext("2d");
+      ctx.clearRect(0, 0, videoOverlay.width, videoOverlay.height);
+      ctx.save();
+      ctx.strokeStyle = "#f59e0b";
+      ctx.lineWidth = 4;
+      ctx.strokeRect(6, 6, videoOverlay.width - 12, videoOverlay.height - 12);
+      if (!bounds) {
+        locateStatus.textContent = "No finder triplet localized; using center crop.";
+        ctx.restore();
+        return;
+      }
+      const mapped = analysisBoundsToDisplayedVideo(bounds);
+      if (!mapped) {
+        locateStatus.textContent = "No video mapping available yet.";
+        ctx.restore();
+        return;
+      }
+      ctx.strokeStyle = "#22c55e";
+      ctx.lineWidth = 5;
+      ctx.strokeRect(mapped.x, mapped.y, mapped.width, mapped.height);
+      ctx.fillStyle = "#22c55e";
+      ctx.restore();
+      locateStatus.textContent = `Finder localization confidence ${bounds.confidence.toFixed(2)}.`;
+    }
+
+    function drawTrackedZoom(sourceCanvas, bounds, sourceVideo = null) {
+      const ctx = captureCanvas.getContext("2d");
+      ctx.fillStyle = "#07111f";
+      ctx.fillRect(0, 0, captureCanvas.width, captureCanvas.height);
+      let drawSource = sourceCanvas;
+      let source = null;
+      if (sourceVideo && bounds && sourceVideo.videoWidth && sourceVideo.videoHeight) {
+        const mapped = analysisBoundsToVideoSource(bounds);
+        if (mapped) {
+          drawSource = sourceVideo;
+          source = mapped;
+        }
+      }
+      if (!source) {
+        const fallbackSize = Math.min(sourceCanvas.width, sourceCanvas.height);
+        source = bounds || {
+          x: (sourceCanvas.width - fallbackSize) / 2,
+          y: (sourceCanvas.height - fallbackSize) / 2,
+          width: fallbackSize,
+          height: fallbackSize
+        };
+      }
+      const pad = Math.max(8, Math.min(source.width, source.height) * 0.18);
+      const sx = Math.max(0, source.x - pad);
+      const sy = Math.max(0, source.y - pad);
+      const sourceWidth = drawSource.videoWidth || drawSource.width;
+      const sourceHeight = drawSource.videoHeight || drawSource.height;
+      const sw = Math.min(sourceWidth - sx, source.width + pad * 2);
+      const sh = Math.min(sourceHeight - sy, source.height + pad * 2);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(drawSource, sx, sy, sw, sh, 0, 0, captureCanvas.width, captureCanvas.height);
+      if (bounds) {
+        const scaleX = captureCanvas.width / sw;
+        const scaleY = captureCanvas.height / sh;
+        ctx.save();
+        ctx.strokeStyle = "#22c55e";
+        ctx.lineWidth = 8;
+        ctx.strokeRect((source.x - sx) * scaleX, (source.y - sy) * scaleY, source.width * scaleX, source.height * scaleY);
+        ctx.restore();
+      }
+    }
+
+    function acceptFrame(frame) {
+      captured.set(frame.index, frame);
+      recvStatus.textContent = `Captured ${captured.size}/${frame.count} frame(s).`;
+      try {
+        if (captured.size === frame.count) {
+          const payload = QSOM.decodeOpticalFrames(captured);
+          decoded.textContent = JSON.stringify(payload, null, 2);
+          recvStatus.textContent = `Decoded ${frame.count} frame(s): ${payload.method}`;
+        }
+      } catch (error) {
+        recvStatus.textContent = `Waiting for clean frames: ${error.message}`;
+      }
+    }
+
+    function scanCanvas(canvas) {
+      const bounds = QSOM.detectOpticalBounds(canvas);
+      const matrix = QSOM.sampleCanvasToMatrix(canvas, { bounds });
+      const frame = QSOM.frameFromMatrix(matrix);
+      acceptFrame(frame);
+      return bounds;
+    }
+
+    function scanVideo() {
+      drawVideoToAnalysis();
+      try {
+        const bounds = scanCanvas(analysisCanvas);
+        drawVideoOverlay(bounds);
+        drawTrackedZoom(analysisCanvas, bounds, video);
+      } catch (error) {
+        drawVideoOverlay(null);
+        drawTrackedZoom(analysisCanvas, null);
+        recvStatus.textContent = `Scanning: ${error.message}`;
+      }
+    }
+
+    document.getElementById("startCamera").addEventListener("click", () => {
+      startCamera().catch(error => { recvStatus.textContent = `Camera error: ${error.message}`; });
+    });
+
+    document.getElementById("scanStill").addEventListener("click", () => {
+      try {
+        const ctx = analysisCanvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, analysisCanvas.width, analysisCanvas.height);
+        ctx.drawImage(sendCanvas, 0, 0, analysisCanvas.width, analysisCanvas.height);
+        const bounds = scanCanvas(analysisCanvas);
+        drawVideoOverlay(null);
+        drawTrackedZoom(analysisCanvas, bounds);
+      } catch (error) {
+        recvStatus.textContent = `Still scan failed: ${error.message}`;
+      }
+    });
+
+    prepareFrames();
+    drawNextFrame();
+  </script>
+</body>
+</html>
